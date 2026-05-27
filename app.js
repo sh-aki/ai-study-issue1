@@ -146,14 +146,7 @@
      ========================================================= */
   function setupVoice() {
     const grid = $("#voiceGrid");
-    const dotsWrap = $("#voiceDots");
-    if (!grid || !dotsWrap) return;
-
-    const perPage = 3;
-    const pages = Math.ceil(VOICES.length / perPage);
-    let page = 0;
-    let paused = false;
-    let timer = null;
+    if (!grid) return;
 
     function cardHTML(v) {
       const avatar = v.photo
@@ -165,46 +158,25 @@
           '<svg class="voice-corner voice-corner-bl" viewBox="0 0 60 70" fill="none" aria-hidden="true"><path d="M12 4 Q14 30 8 64" stroke="#A3B18A" stroke-width="1" stroke-linecap="round" opacity="0.7"/><ellipse cx="6" cy="20" rx="5" ry="2" transform="rotate(-40 6 20)" fill="#A3B18A" opacity="0.45"/><ellipse cx="18" cy="32" rx="5" ry="2" transform="rotate(35 18 32)" fill="#A3B18A" opacity="0.5"/></svg>' +
           '<span class="voice-q-mark" aria-hidden="true">&ldquo;</span>' +
           '<div class="voice-head">' + avatar + '<h3 class="voice-title">' + v.quote + '</h3></div>' +
+          (typeof v.rating === "number" ? '<div class="voice-rating" role="img" aria-label="5段階中 ' + v.rating.toFixed(1) + '">' + renderStars(v.rating) + '</div>' : '') +
           '<p class="voice-body">' + v.body + '</p>' +
           '<div class="voice-foot">' + v.who + '</div>' +
         '</article>'
       );
     }
 
-    function render() {
-      const visible = [];
-      for (let i = 0; i < perPage; i++) visible.push(VOICES[(page * perPage + i) % VOICES.length]);
-      grid.innerHTML = visible.map(cardHTML).join("");
-      $$("#voiceDots .dot").forEach((d, i) => {
-        d.classList.toggle("active", i === page);
-        d.setAttribute("aria-selected", i === page ? "true" : "false");
-      });
-    }
+    // 連続スクロール（マーキー）。継ぎ目をなくすため同じ並びを2セット連結し、
+    // CSS アニメーションで全体を -50%（＝1セット分）ゆっくり左へ流す
+    const seq = VOICES.concat(VOICES);
+    grid.innerHTML = seq.map(cardHTML).join("");
+    // 複製分は支援技術に重複読み上げさせない
+    $$(".voice-card", grid).forEach((c, i) => { if (i >= VOICES.length) c.setAttribute("aria-hidden", "true"); });
 
-    // dots
-    dotsWrap.innerHTML = "";
-    for (let i = 0; i < pages; i++) {
-      const b = document.createElement("button");
-      b.className = "dot";
-      b.setAttribute("role", "tab");
-      b.setAttribute("aria-label", "お客様の声 ページ " + (i + 1));
-      b.addEventListener("click", () => { page = i; render(); restart(); });
-      dotsWrap.appendChild(b);
-    }
-
-    function restart() {
-      if (timer) clearInterval(timer);
-      if (prefersReducedMotion()) return; // 自動回転しない
-      timer = setInterval(() => { if (!paused) { page = (page + 1) % pages; render(); } }, 6000);
-    }
-
-    // ホバー / フォーカスで一時停止（キーボード操作にも配慮）
+    // ホバー / フォーカスで一時停止（読みたいときに止められる）
     const vp = $(".voice-viewport");
-    ["mouseenter", "focusin"].forEach((ev) => vp.addEventListener(ev, () => { paused = true; }));
-    ["mouseleave", "focusout"].forEach((ev) => vp.addEventListener(ev, () => { paused = false; }));
-
-    render();
-    restart();
+    const setPlay = (s) => { grid.style.animationPlayState = s; };
+    ["mouseenter", "focusin"].forEach((ev) => vp.addEventListener(ev, () => setPlay("paused")));
+    ["mouseleave", "focusout"].forEach((ev) => vp.addEventListener(ev, () => setPlay("running")));
   }
 
   /* =========================================================
